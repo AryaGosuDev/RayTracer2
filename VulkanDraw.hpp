@@ -100,10 +100,16 @@ namespace VkApplication {
             stagingBuffer, stagingBufferMemory);
 
         void* data;
+        // vulkan buffers live on the gpu, so the cpu can't access them directly
+        // maps gpu mem to cpu pointers
         vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+        // copy mem
         memcpy(data, vertices.data(), (size_t)bufferSize);
+        // must unmap before gpu access
+        // if VK_MEMORY_PROPERTY_HOST_COHERENT_BIT  was not set, flushing memory would be necessary
         vkUnmapMemory(device, stagingBufferMemory);
 
+        // device local memory, cannot transfer directly from cpu, so a staging buffer is needed
         createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
 
@@ -151,7 +157,10 @@ namespace VkApplication {
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferInfo.size = size;
+        // specify the type of memory to use
         bufferInfo.usage = usage;
+        // Best performance, use when only one queue family needs access.
+        // VK_SHARING_MODE_CONCURRENT	Use when multiple queue families need to access the buffer at the same time (e.g., shared compute-graphics buffer).
         bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
         if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
@@ -292,7 +301,7 @@ namespace VkApplication {
         }
     }
 
-    VkFormat MainVulkApplication::findSupportedFormat(const std::vector<VkFormat>& candidates, 
+    VkFormat MainVulkApplication::findSupportedFormat(const std::vector<VkFormat>& candidates,
         VkImageTiling tiling, VkFormatFeatureFlags features) {
         for (VkFormat format : candidates) {
             VkFormatProperties props;
@@ -308,10 +317,6 @@ namespace VkApplication {
 
         throw std::runtime_error("failed to find supported format!");
     }
-
-    
-
-    
 
     void MainVulkApplication::createCommandPool() {
         QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice);

@@ -46,14 +46,9 @@
 #include <vulkan/vulkan_core.h>
 #include <GLFW/glfw3.h>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb/stb_image.h>
-
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tinyObjLoader/tiny_obj_loader.h>
 
-const std::string MODEL_PATH = "models/viking_room.obj";
-const std::string TEXTURE_PATH = "textures/viking_room.png";
 
 #ifdef _DEBUG
 constexpr bool enableValidationLayers = true;
@@ -76,8 +71,22 @@ namespace VkApplication{
 	constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
 	const std::vector<const char*> deviceExtensions = {
-	VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME
+	VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+		"VK_KHR_shader_clock",
+		VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+	VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+	VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
+	VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
+	VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
+	VK_KHR_SPIRV_1_4_EXTENSION_NAME,
+	VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME
+	//VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME
 	};
+
+	template <typename T>
+	T align_up(T value, T alignment) {
+		return (value + alignment - 1) & ~(alignment - 1);
+	}
 
 	struct QueueFamilyIndices {
 		std::optional<uint32_t> graphicsFamily;
@@ -105,7 +114,6 @@ struct Vertex {
 		bindingDescription.binding = 0;
 		bindingDescription.stride = sizeof(Vertex);
 		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
 		return bindingDescription;
 	}
 
@@ -136,7 +144,7 @@ struct Vertex {
 	}
 
 	bool operator==(const Vertex& other) const {
-		return pos == other.pos && color == other.color && vertexNormal == other.vertexNormal;
+		return pos == other.pos && color == other.color && vertexNormal == other.vertexNormal && texCoord == other.texCoord;
 	}
 };
 
@@ -187,46 +195,94 @@ struct InstanceData {
 	}
 };
 
-/*
-namespace std {
-	template<> struct hash<VkApplication::Vertex> {
-		size_t operator()(VkApplication::Vertex const& vertex) const {
-			return ((hash<glm::vec3>()(vertex.pos) ^ (hash<glm::vec3>()(vertex.color) << 1)) >> 1);
+struct AccelerationStructure {
+	VkAccelerationStructureKHR handle;
+	uint64_t deviceAddress = 0;
+	VkDeviceMemory memory;
+	VkBuffer buffer;
+};
+
+struct ScratchBuffer {
+	uint64_t deviceAddress = 0;
+	VkBuffer handle = VK_NULL_HANDLE;
+	VkDeviceMemory memory = VK_NULL_HANDLE;
+};
+
+// mostly extends buffer class
+struct ShaderBindingTable {
+	VkStridedDeviceAddressRegionKHR stridedDeviceAddressRegion{};
+	VkDevice* device;
+	VkBuffer buffer = VK_NULL_HANDLE;
+	VkDeviceMemory memory = VK_NULL_HANDLE;
+	VkDescriptorBufferInfo descriptor;
+	VkDeviceSize size = 0;
+	VkDeviceSize alignment = 0;
+	void* mapped = nullptr;
+	/** @brief Usage flags to be filled by external source at buffer creation (to query at some later point) */
+	VkBufferUsageFlags usageFlags;
+	/** @brief Memory property flags to be filled by external source at buffer creation (to query at some later point) */
+	VkMemoryPropertyFlags memoryPropertyFlags;
+
+	VkResult map(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0) {
+		return vkMapMemory(*device, memory, offset, size, 0, &mapped);
+	}
+	void unmap() {
+		if (mapped){
+			vkUnmapMemory(*device, memory);
+			mapped = nullptr;
 		}
-	};
-}
-*/
+	}
+	VkResult bind(VkDeviceSize offset = 0) {
+		return vkBindBufferMemory(*device, buffer, memory, offset);
+	}
+	void setupDescriptor(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0) {
+		descriptor.offset = offset;
+		descriptor.buffer = buffer;
+		descriptor.range = size;
+	}
+	void copyTo(void* data, VkDeviceSize size) {
+		assert(mapped);
+		memcpy(mapped, data, size);
+	}
+	VkResult flush(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0) {
+		VkMappedMemoryRange mappedRange = {};
+		mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+		mappedRange.memory = memory;
+		mappedRange.offset = offset;
+		mappedRange.size = size;
+		return vkFlushMappedMemoryRanges(*device, 1, &mappedRange);
+	}
+	VkResult invalidate(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0) {
+		VkMappedMemoryRange mappedRange = {};
+		mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+		mappedRange.memory = memory;
+		mappedRange.offset = offset;
+		mappedRange.size = size;
+		return vkInvalidateMappedMemoryRanges(*device, 1, &mappedRange);
+	}
+	void destroy() {
+		if (buffer) vkDestroyBuffer(*device, buffer, nullptr);
+		if (memory)vkFreeMemory(*device, memory, nullptr);
+	}
+};
+
+struct ShaderBindingTables {
+	ShaderBindingTable raygen;
+	ShaderBindingTable miss;
+	ShaderBindingTable hit;
+	ShaderBindingTable callable;
+} shaderBindingTables;
 
 struct UniformBufferObject {
 	glm::mat4 model;
 	glm::mat4 view;
 	glm::mat4 proj;
 	glm::mat4 normalMatrix;
-	glm::vec4 lightPos;
-};
-
-struct UniformFragmentObject {
-	glm::vec4 Ambient;
-	glm::vec4 LightColor;
-	float Reflectivity;
-	float Strength;
-	glm::vec4 EyeDirection;
-	float ConstantAttenuation;
-	float LinearAttenuation;
-	float QuadraticAttenuation;
-	glm::mat4 viewMatrix;
-	glm::mat4 eyeViewMatrix;
 };
 
 struct PushConstants {
 	int useReflectionSampler;
 };
-
-struct {
-	VkPipeline ground;
-	VkPipeline cube;
-	VkPipeline mirror;
-} pipelines;
 
 struct KeyControls {
 	bool kickParticle = false;
@@ -253,7 +309,6 @@ public:
 		initWindow();
 		initVulkan(appName);
 	}
-
 
 	void cleanupApp() {
 		cleanup();
@@ -327,7 +382,6 @@ private:
 	std::vector<VkDescriptorSet> descriptorSets;
 
 	UniformBufferObject ubo;
-	UniformFragmentObject ufo;
 
 	std::vector<VkCommandBuffer> commandBuffers;
 
