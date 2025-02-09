@@ -49,7 +49,6 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tinyObjLoader/tiny_obj_loader.h>
 
-
 #ifdef _DEBUG
 constexpr bool enableValidationLayers = true;
 #else
@@ -57,6 +56,8 @@ constexpr bool enableValidationLayers = false;
 #endif
 
 #include "ValidationLayers.hpp"
+// custom memory management module
+#include "MMM.h"
 
 static void check_vk_result(VkResult err) {
 	if (err == 0)
@@ -288,6 +289,17 @@ struct KeyControls {
 	bool kickParticle = false;
 };
 
+struct RTImageViews {
+	VkImage RTColorImage;
+	VkImageView RTColorImageView;
+	VkDeviceMemory RTColorImageMemory;
+
+	VkImage RTDepthImage;
+	VkImageView RTDepthImageView;
+	VkDeviceMemory RTDepthImageMemory;
+
+};
+
 class MainVulkApplication {
 
 	friend void mainLoop(VkApplication::MainVulkApplication*);
@@ -318,8 +330,8 @@ private:
 
 	static MainVulkApplication* pinstance_;
 
-	size_t WIDTH = 800;
-	size_t HEIGHT = 600;
+	size_t WIDTH = 1600;
+	size_t HEIGHT = 1200;
 	
 	GLFWwindow* window;
 	ImGui_ImplVulkanH_Window imgui_window;
@@ -359,7 +371,6 @@ private:
 	VkSampler textureSampler;
 
 	std::vector<Vertex> vertices;
-
 	std::vector<uint32_t> indices;
 	VkBuffer vertexBuffer;
 	VkDeviceMemory vertexBufferMemory;
@@ -392,6 +403,50 @@ private:
 	size_t currentFrame = 0;
 
 	bool framebufferResized = false;
+
+	VkPipeline rayTracingPipeline;
+	VkPipelineLayout pipelineLayoutRT;
+	VkDescriptorSetLayout descriptorSetLayoutRT;
+	VkDescriptorPool descriptorPoolRT;
+
+	RTImageViews rtImageViews;
+	VkDescriptorSet descriptorSetRT;
+
+	VkFence renderFenceRT;
+	VkSemaphore finishedSemaphoreRT;
+	VkCommandBuffer commandBufferRT;
+
+	VkBuffer aabbBuffer_;
+	VkDeviceMemory aabbBufferMemory_;
+	VkBuffer asBuffer;
+
+	VkPhysicalDeviceRayTracingPipelinePropertiesKHR  rayTracingPipelineProperties{};
+	VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures{};
+
+	// Enabled features and properties
+	VkPhysicalDeviceBufferDeviceAddressFeatures enabledBufferDeviceAddresFeatures{};
+	VkPhysicalDeviceRayTracingPipelineFeaturesKHR enabledRayTracingPipelineFeatures{};
+	VkPhysicalDeviceAccelerationStructureFeaturesKHR enabledAccelerationStructureFeatures{};
+
+	std::vector<VkRayTracingShaderGroupCreateInfoKHR> shaderGroups = {};
+
+	AccelerationStructure bottomLevelAS;
+	AccelerationStructure topLevelAS;
+	ScratchBuffer scratchBuffer;
+
+	// Function pointers for ray tracing related stuff
+	PFN_vkGetBufferDeviceAddressKHR vkGetBufferDeviceAddressKHR;
+	PFN_vkCreateAccelerationStructureKHR vkCreateAccelerationStructureKHR;
+	PFN_vkDestroyAccelerationStructureKHR vkDestroyAccelerationStructureKHR;
+	PFN_vkGetAccelerationStructureBuildSizesKHR vkGetAccelerationStructureBuildSizesKHR;
+	PFN_vkGetAccelerationStructureDeviceAddressKHR vkGetAccelerationStructureDeviceAddressKHR;
+	PFN_vkBuildAccelerationStructuresKHR vkBuildAccelerationStructuresKHR;
+	PFN_vkCmdBuildAccelerationStructuresKHR vkCmdBuildAccelerationStructuresKHR;
+	PFN_vkCmdTraceRaysKHR vkCmdTraceRaysKHR;
+	PFN_vkGetRayTracingShaderGroupHandlesKHR vkGetRayTracingShaderGroupHandlesKHR;
+	PFN_vkCreateRayTracingPipelinesKHR vkCreateRayTracingPipelinesKHR;
+
+	void* deviceCreatepNextChain = nullptr;
 
 	//FUNCTIONS
 	void createInstance(std::string appName);
@@ -580,6 +635,7 @@ namespace std {
 #include "VulkanSync.hpp"
 #include "VulkanGeometry.hpp"
 #include "VulkanTexture.hpp"
+#include "VulkanRTDraw.hpp"
 #include "VulkanImgui.hpp"
 
 #endif

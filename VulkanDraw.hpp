@@ -6,7 +6,6 @@ namespace VkApplication {
     void MainVulkApplication::drawFrame() {
         vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
-
         uint32_t imageIndex;
         VkResult result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, 
             imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
@@ -365,6 +364,5 @@ namespace VkApplication {
         vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
     }
 }
-
 
 #endif
