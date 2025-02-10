@@ -29,7 +29,7 @@ namespace VkApplication {
         }
     }
 
-    void MainVulkApplication::createDescriptorPool() {
+    void MainVulkApplication::createDescriptorPoolImGUI() {
 
         VkDescriptorPoolSize poolSizes[] =
         {
@@ -67,9 +67,11 @@ namespace VkApplication {
         allocInfo.pSetLayouts = layouts.data();
 
         descriptorSets.resize(swapChainImages.size());
-        if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+        // Vulkan allocates descriptor sets (not memory for buffers or textures).
+        // The descriptor set is simply a handle that references existing GPU resources.
+        if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) 
             throw std::runtime_error("failed to allocate descriptor sets!");
-        }
+        
 
         for (size_t i = 0; i < swapChainImages.size(); i++) {
             VkDescriptorBufferInfo bufferInfo{};
@@ -87,6 +89,8 @@ namespace VkApplication {
             descriptorWrites[0].descriptorCount = 1;
             descriptorWrites[0].pBufferInfo = &bufferInfo;
 
+            // Updates a descriptor set with a buffer, image, or sampler.
+            // Vulkan does not automatically track uniforms/textures like OpenGL.
             vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
         }
     }
