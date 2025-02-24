@@ -84,11 +84,6 @@ namespace VkApplication{
 	//VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME
 	};
 
-	template <typename T>
-	T align_up(T value, T alignment) {
-		return (value + alignment - 1) & ~(alignment - 1);
-	}
-
 	struct QueueFamilyIndices {
 		std::optional<uint32_t> graphicsFamily;
 		std::optional<uint32_t> presentFamily;
@@ -390,6 +385,7 @@ private:
 	std::vector<VkDeviceMemory> uniformDynamicBuffersMemory;
 
 	VkDescriptorPool descriptorPool;
+	VkDescriptorPool descriptorPoolIMGui;
 	std::vector<VkDescriptorSet> descriptorSets;
 
 	UniformBufferObject ubo;
@@ -404,27 +400,37 @@ private:
 
 	bool framebufferResized = false;
 
-	VkPipeline rayTracingPipeline;
-	VkPipelineLayout pipelineLayoutRT;
-	VkDescriptorSetLayout descriptorSetLayoutRT;
-	VkDescriptorPool descriptorPoolRT;
-
-	RTImageViews rtImageViews;
-	VkDescriptorSet descriptorSetRT;
-
-	VkFence renderFenceRT;
-	VkSemaphore finishedSemaphoreRT;
-	VkCommandBuffer commandBufferRT;
-
-	VkBuffer aabbBuffer_;
-	VkDeviceMemory aabbBufferMemory_;
 	VkBuffer asBuffer;
 
+	/* This struct holds hardware properties related to the ray tracing pipeline, such as shader recursion depth and performance limits.
+	shaderGroupHandleSize: Size(in bytes) of each shader group handle.
+	maxRayRecursionDepth : Maximum ray recursion depth supported(e.g., 31 or higher).
+	maxRayDispatchInvocationCount : Max invocations for a single vkCmdTraceRaysKHR() call.
+	shaderGroupBaseAlignment : Memory alignment requirement for shader groups.
+	*/
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR  rayTracingPipelineProperties{};
+	/*This struct enables support for acceleration structures(BVH trees) used in Vulkan Ray Tracing.
+
+	accelerationStructure: Indicates whether acceleration structures(AS) are supported.
+	accelerationStructureCaptureReplay : Enables AS capture& replay(e.g., for debugging).
+	accelerationStructureIndirectBuild : Supports indirect AS builds.
+	accelerationStructureHostCommands : Allows AS builds from the CPU instead of GPU.
+	*/
 	VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures{};
 
 	// Enabled features and properties
+	/*
+	This struct enables buffer device addresses, which allow accessing GPU memory directly via 64 - bit pointers.This is crucial for ray tracing acceleration structures.
+	 bufferDeviceAddress: Enables vkGetBufferDeviceAddress(), allowing buffers to act as raw pointers.
+	 bufferDeviceAddressCaptureReplay: Allows capturing/replaying buffer addresses.
+	 bufferDeviceAddressMultiDevice: Enables buffer addresses in multi-GPU environments.
+	*/
 	VkPhysicalDeviceBufferDeviceAddressFeatures enabledBufferDeviceAddresFeatures{};
+	/*This struct enables the ray tracing pipeline itself.
+	rayTracingPipeline: Enables VkPipeline objects that contain ray tracing shaders.
+	rayTracingPipelineShaderGroupHandleCaptureReplay: Supports capturing shader group handles for replay.
+	rayTracingPipelineTraceRaysIndirect: Allows indirect dispatch of vkCmdTraceRaysKHR().
+	*/
 	VkPhysicalDeviceRayTracingPipelineFeaturesKHR enabledRayTracingPipelineFeatures{};
 	VkPhysicalDeviceAccelerationStructureFeaturesKHR enabledAccelerationStructureFeatures{};
 
@@ -473,7 +479,6 @@ private:
 		VkFormat, VkImageTiling, VkImageUsageFlags, VkMemoryPropertyFlags, VkImage&, VkDeviceMemory&);
 	uint32_t findMemoryType(uint32_t, VkMemoryPropertyFlags);
 
-	void createRenderPass();
 	VkFormat findDepthFormat();
 	VkFormat findSupportedFormat(const std::vector<VkFormat>&, VkImageTiling, VkFormatFeatureFlags);
 
@@ -527,7 +532,6 @@ private:
 		createLogicalDevice();
 		createSwapChain();
 		createImageViews();
-		createRenderPass();
 		createDescriptorSetLayout();
 		createGraphicsPipeline();
 		createCommandPool();

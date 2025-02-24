@@ -8,7 +8,7 @@ namespace VkApplication {
 
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-		window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan RT", nullptr, nullptr);
+		window = glfwCreateWindow(WIDTH, HEIGHT, "Arya Wallfacer Vulkan RT", nullptr, nullptr);
 		glfwSetWindowUserPointer(window, this);
 		glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
 	}
@@ -19,6 +19,7 @@ namespace VkApplication {
 	}
 
 	void MainVulkApplication::createSurface() {
+		// does not allocate memory, memory is allocated later when the swapchain is allocated
 		if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create window surface!");
 		}

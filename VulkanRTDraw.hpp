@@ -317,46 +317,8 @@ namespace VkApplication {
 
 	}
 
-	void MainVulkApplication::descriptorLayoutSetupRT() {
 
-		VkDescriptorSetLayoutBinding accelLayoutBinding{};
-		accelLayoutBinding.binding = 0;
-		accelLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-		accelLayoutBinding.descriptorCount = 1;
-		accelLayoutBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-
-		VkDescriptorSetLayoutBinding uniformLayoutBinding{};
-		uniformLayoutBinding.binding = 1;
-		uniformLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		uniformLayoutBinding.descriptorCount = 1;
-		uniformLayoutBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-
-		VkDescriptorSetLayoutBinding colorImageLayoutBinding{};
-		colorImageLayoutBinding.binding = 2;
-		colorImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		colorImageLayoutBinding.descriptorCount = 1;
-		colorImageLayoutBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-		colorImageLayoutBinding.pImmutableSamplers = nullptr; // Not needed for image
-
-		VkDescriptorSetLayoutBinding depthImageLayoutBinding{};
-		depthImageLayoutBinding.binding = 3;
-		depthImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		depthImageLayoutBinding.descriptorCount = 1;
-		depthImageLayoutBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-		depthImageLayoutBinding.pImmutableSamplers = nullptr; // Not needed for image
-
-		std::array<VkDescriptorSetLayoutBinding, 4> bindings = { accelLayoutBinding, uniformLayoutBinding, colorImageLayoutBinding, depthImageLayoutBinding };
-		VkDescriptorSetLayoutCreateInfo layoutInfo{};
-		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-		layoutInfo.pBindings = bindings.data();
-
-		if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayoutRT) != VK_SUCCESS) {
-			throw std::runtime_error("failed to create descriptor set layout!");
-		}
-	}
-
-	void MainVulkApplication::createDescriptorSetsRT() {
+	void MainVulkApplication::createDescriptorSets() {
 
 		std::vector<VkDescriptorPoolSize> poolSizes = {
 			{ VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1 },
@@ -482,8 +444,6 @@ namespace VkApplication {
 		vkGetRayTracingShaderGroupHandlesKHR = reinterpret_cast<PFN_vkGetRayTracingShaderGroupHandlesKHR>(vkGetDeviceProcAddr(device, "vkGetRayTracingShaderGroupHandlesKHR"));
 		vkCreateRayTracingPipelinesKHR = reinterpret_cast<PFN_vkCreateRayTracingPipelinesKHR>(vkGetDeviceProcAddr(device, "vkCreateRayTracingPipelinesKHR"));
 
-		descriptorLayoutSetupRT();
-		createAABBBuffer();
 		setupAS();
 
 		createImage(swapChainExtent.width, swapChainExtent.height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
