@@ -46,8 +46,10 @@
 #include <vulkan/vulkan_core.h>
 #include <GLFW/glfw3.h>
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tinyObjLoader/tiny_obj_loader.h>
+#define ASSIMPORT_INCLUDES
+#include <assimp/Importer.hpp>      // C++ importer interface
+#include <assimp/scene.h>           // Output data structure
+#include <assimp/postprocess.h>     // Post processing flags
 
 #ifdef _DEBUG
 constexpr bool enableValidationLayers = true;
@@ -518,7 +520,8 @@ private:
 	void transitionImageLayout(VkImage, VkFormat, VkImageLayout, VkImageLayout);
 	void createTextureImageView();
 	void createTextureSampler();
-
+	void setupRT();
+	void setupAS();
 
 	void initVulkan(std::string appName ) {
 
@@ -641,5 +644,6 @@ namespace std {
 #include "VulkanTexture.hpp"
 #include "VulkanRTDraw.hpp"
 #include "VulkanImgui.hpp"
+#include "VulkanAS.hpp"
 
 #endif
