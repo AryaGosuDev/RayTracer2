@@ -58,7 +58,7 @@ Would you like an example setup for handling materials and textures in Vulkan RT
 		asCreateInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
 		asCreateInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 		asCreateInfo.size = sizeInfo.accelerationStructureSize;
-		vkCreateAccelerationStructureKHR(device, &asCreateInfo, nullptr, &blas);
+		check_vk_result(vkCreateAccelerationStructureKHR(device, &asCreateInfo, nullptr, &bottomLevelAS.handle));
 
 		VkAccelerationStructureBuildRangeInfoKHR rangeInfo = {};
 		rangeInfo.primitiveCount = primitiveCount;

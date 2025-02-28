@@ -40,6 +40,7 @@ namespace VkApplication {
 		if (errcode != VK_SUCCESS) {
 			throw std::runtime_error("failed to create instance!");
 		}
+		SetObjectName(device, reinterpret_cast<uint64_t>(instance), VK_OBJECT_TYPE_INSTANCE, "Main Instance");
 	}
 
 
@@ -63,6 +64,18 @@ namespace VkApplication {
 			std::cout << xVK.extensionName << std::endl;
 		
 		return true;
+	}
+
+	void MainVulkApplication::SetObjectName(VkDevice device, uint64_t objectHandle, VkObjectType objectType, const std::string& name) {
+		if (vkSetDebugUtilsObjectNameEXT) {
+			VkDebugUtilsObjectNameInfoEXT nameInfo{};
+			nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+			nameInfo.objectType = objectType;
+			nameInfo.objectHandle = objectHandle;
+			nameInfo.pObjectName = name.c_str();
+
+			vkSetDebugUtilsObjectNameEXT(device, &nameInfo);
+		}
 	}
 
 }

@@ -71,6 +71,8 @@ static void check_vk_result(VkResult err) {
 
 namespace VkApplication{
 
+	const std::string MODEL_PATH = "models/LPRoom.glb";
+
 	constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
 	const std::vector<const char*> deviceExtensions = {
@@ -103,7 +105,7 @@ namespace VkApplication{
 
 struct Vertex {
 	glm::vec3 color;
-	glm::vec3 vertexNormal;
+	glm::vec3 normal;
 	glm::vec3 pos;
 	glm::vec2 texCoord;
 
@@ -126,7 +128,7 @@ struct Vertex {
 		attributeDescriptions[1].binding = 0;
 		attributeDescriptions[1].location = 1;
 		attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attributeDescriptions[1].offset = offsetof(Vertex, vertexNormal);
+		attributeDescriptions[1].offset = offsetof(Vertex, normal);
 
 		attributeDescriptions[2].binding = 0;
 		attributeDescriptions[2].location = 2;
@@ -207,7 +209,7 @@ struct ScratchBuffer {
 };
 
 // mostly extends buffer class
-struct ShaderBindingTable {
+struct ExtendedvKBuffer {
 	VkStridedDeviceAddressRegionKHR stridedDeviceAddressRegion{};
 	VkDevice* device;
 	VkBuffer buffer = VK_NULL_HANDLE;
@@ -265,10 +267,10 @@ struct ShaderBindingTable {
 };
 
 struct ShaderBindingTables {
-	ShaderBindingTable raygen;
-	ShaderBindingTable miss;
-	ShaderBindingTable hit;
-	ShaderBindingTable callable;
+	ExtendedvKBuffer raygen;
+	ExtendedvKBuffer miss;
+	ExtendedvKBuffer hit;
+	ExtendedvKBuffer callable;
 } shaderBindingTables;
 
 struct UniformBufferObject {
@@ -276,14 +278,6 @@ struct UniformBufferObject {
 	glm::mat4 view;
 	glm::mat4 proj;
 	glm::mat4 normalMatrix;
-};
-
-struct PushConstants {
-	int useReflectionSampler;
-};
-
-struct KeyControls {
-	bool kickParticle = false;
 };
 
 struct RTImageViews {
@@ -294,8 +288,42 @@ struct RTImageViews {
 	VkImage RTDepthImage;
 	VkImageView RTDepthImageView;
 	VkDeviceMemory RTDepthImageMemory;
-
 };
+
+struct Material {
+	glm::vec3 diffuseColor;
+	float roughness;
+};
+
+struct SceneObject {
+	std::string name;
+	uint64_t id; // hash key
+
+	ExtendedvKBuffer vertexBuffer;
+	ExtendedvKBuffer indexBuffer;
+	AccelerationStructure blas; 
+
+	Material material;
+	glm::mat4 transform; 
+};
+
+class Scene {
+public:
+	std::unordered_map<uint64_t, SceneObject> objects;
+
+	void addObject(const SceneObject& obj) {
+		objects[obj.id] = obj;
+	}
+
+	SceneObject* getObjectByName(const std::string& name) {
+		uint64_t id = std::hash<std::string>{}(name);
+		if (objects.find(id) != objects.end()) {
+			return &objects[id];
+		}
+		return nullptr;
+	}
+};
+
 
 class MainVulkApplication {
 
@@ -332,7 +360,6 @@ private:
 	
 	GLFWwindow* window;
 	ImGui_ImplVulkanH_Window imgui_window;
-	KeyControls keyControl;
 
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
@@ -351,28 +378,16 @@ private:
 	std::vector<VkImageView> swapChainImageViews;
 	std::vector<VkFramebuffer> swapChainFramebuffers;
 
+	VkImage depthImage;
+	VkDeviceMemory depthImageMemory;
+	VkImageView depthImageView;
+
 	VkRenderPass renderPass;
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkPipelineLayout pipelineLayout;
 	VkPipeline graphicsPipeline;
 
 	VkCommandPool commandPool;
-
-	VkImage depthImage;
-	VkDeviceMemory depthImageMemory;
-	VkImageView depthImageView;
-
-	VkImage textureImage;
-	VkDeviceMemory textureImageMemory;
-	VkImageView textureImageView;
-	VkSampler textureSampler;
-
-	std::vector<Vertex> vertices;
-	std::vector<uint32_t> indices;
-	VkBuffer vertexBuffer;
-	VkDeviceMemory vertexBufferMemory;
-	VkBuffer indexBuffer;
-	VkDeviceMemory indexBufferMemory;
 
 	size_t dynamicAlignment;
 	size_t bufferDynamicSize;
@@ -458,6 +473,7 @@ private:
 
 	//FUNCTIONS
 	void createInstance(std::string appName);
+	void SetObjectName(VkDevice, uint64_t, VkObjectType, const std::string&);
 	//Create the viewport
 	void initWindow();
 	//Call back to re-buffer the viewport window
@@ -493,7 +509,7 @@ private:
 
 	void createVertexBuffer();
 	void createBuffer(VkDeviceSize, VkBufferUsageFlags,
-		VkMemoryPropertyFlags, VkBuffer&, VkDeviceMemory&);
+		VkMemoryPropertyFlags, VkBuffer&, VkDeviceMemory&, bool );
 	void createIndexBuffer();
 	void createUniformBuffers();
 	void createDescriptorPool();
@@ -522,6 +538,8 @@ private:
 	void createTextureSampler();
 	void setupRT();
 	void setupAS();
+	void createBLAS();
+	void createTLAS();
 
 	void initVulkan(std::string appName ) {
 

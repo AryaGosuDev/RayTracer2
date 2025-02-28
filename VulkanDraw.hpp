@@ -152,7 +152,7 @@ namespace VkApplication {
     }
 
     void MainVulkApplication::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, 
-        VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
+        VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory, bool deviceAddressCond) {
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferInfo.size = size;
@@ -173,6 +173,15 @@ namespace VkApplication {
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = memRequirements.size;
         allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+        allocInfo.pNext = NULL;
+
+        VkMemoryAllocateFlagsInfo allocFlagsInfo{};
+        if (deviceAddressCond) {
+            allocFlagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
+            allocFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT; // Allocate memory with device address bit
+            allocFlagsInfo.deviceMask = 0;
+            allocInfo.pNext = &allocFlagsInfo;
+        }
 
         if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
             throw std::runtime_error("failed to allocate buffer memory!");

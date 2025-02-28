@@ -89,9 +89,17 @@
     <ClInclude Include="MMM.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="VulkanAS.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="shaders\shader_base.frag" />
-    <None Include="shaders\shader_base.vert" />
+    <None Include="shaders\RT_AH.rah" />
+    <None Include="shaders\RT_AH_shadow.rah" />
+    <None Include="shaders\RT_CH.rch" />
+    <None Include="shaders\RT_intersection.rint" />
+    <None Include="shaders\RT_miss.rmiss" />
+    <None Include="shaders\RT_miss_shadow.rmiss" />
+    <None Include="shaders\RT_raygen.rgen" />
   </ItemGroup>
 </Project>
