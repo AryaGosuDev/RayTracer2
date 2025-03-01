@@ -144,7 +144,7 @@ struct Vertex {
 	}
 
 	bool operator==(const Vertex& other) const {
-		return pos == other.pos && color == other.color && vertexNormal == other.vertexNormal && texCoord == other.texCoord;
+		return pos == other.pos && color == other.color && normal == other.normal && texCoord == other.texCoord;
 	}
 };
 
@@ -218,6 +218,8 @@ struct ExtendedvKBuffer {
 	VkDeviceSize size = 0;
 	VkDeviceSize alignment = 0;
 	void* mapped = nullptr;
+	VkObjectType objectType; 
+	std::string name;
 	/** @brief Usage flags to be filled by external source at buffer creation (to query at some later point) */
 	VkBufferUsageFlags usageFlags;
 	/** @brief Memory property flags to be filled by external source at buffer creation (to query at some later point) */
@@ -292,12 +294,21 @@ struct RTImageViews {
 
 struct Material {
 	glm::vec3 diffuseColor;
+	glm::vec3 ambientColor;
+	glm::vec3 specularColor;
 	float roughness;
+	float metallic;
+	int textureIndex;  // Index into the texture array
+	
 };
 
 struct SceneObject {
 	std::string name;
 	uint64_t id; // hash key
+
+	SceneObject() {
+		id = std::hash<std::string>{}(name);
+	}
 
 	ExtendedvKBuffer vertexBuffer;
 	ExtendedvKBuffer indexBuffer;
@@ -307,9 +318,16 @@ struct SceneObject {
 	glm::mat4 transform; 
 };
 
+struct Light {
+	glm::vec3 position;
+	glm::vec3 color;
+	float intensity;
+};
+
 class Scene {
 public:
 	std::unordered_map<uint64_t, SceneObject> objects;
+	std::vector<Light> lights;
 
 	void addObject(const SceneObject& obj) {
 		objects[obj.id] = obj;
@@ -383,14 +401,14 @@ private:
 	VkImageView depthImageView;
 
 	VkRenderPass renderPass;
-	VkDescriptorSetLayout descriptorSetLayout;
+
+	VkDescriptorSetLayout globalDescriptorSetLayout;
 	VkPipelineLayout pipelineLayout;
 	VkPipeline graphicsPipeline;
 
-	VkCommandPool commandPool;
+	RTImageViews rtImageViews;
 
-	size_t dynamicAlignment;
-	size_t bufferDynamicSize;
+	VkCommandPool commandPool;
 
 	std::vector<VkBuffer> uniformBuffers;
 	std::vector<VkDeviceMemory> uniformBuffersMemory;

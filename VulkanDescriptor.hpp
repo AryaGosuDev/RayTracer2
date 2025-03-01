@@ -5,22 +5,51 @@ namespace VkApplication {
 
     void MainVulkApplication::createDescriptorSetLayout() {
 
+        /*
+        Separate descriptor sets into different sets so that updates can be less frequent
+        for data that doesn't need to be updated constantly.
+        */
+
+        /* SET 0 */
         size_t bindingCounter = 0;
-        std::vector<VkDescriptorSetLayoutBinding> bindings;
+        std::vector<VkDescriptorSetLayoutBinding> globalBindings;
+
+        //AS
         VkDescriptorSetLayoutBinding accelLayoutBinding{};
         accelLayoutBinding.binding = bindingCounter++;
         accelLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
         accelLayoutBinding.descriptorCount = 1;
         accelLayoutBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-        bindings.push_back(accelLayoutBinding);
+        globalBindings.push_back(accelLayoutBinding);
 
+        //UBO
         VkDescriptorSetLayoutBinding uniformLayoutBinding{};
         uniformLayoutBinding.binding = bindingCounter++;
         uniformLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         uniformLayoutBinding.descriptorCount = 1;
         uniformLayoutBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-        bindings.push_back(uniformLayoutBinding);
+        globalBindings.push_back(uniformLayoutBinding);
 
+        //Light buffer
+        VkDescriptorSetLayoutBinding lightBinding{};
+        lightBinding.binding = bindingCounter++;
+        lightBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        lightBinding.descriptorCount = 1;
+        lightBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;;
+        globalBindings.push_back(lightBinding);
+
+        VkDescriptorSetLayoutCreateInfo globalLayoutInfo{};
+        globalLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        globalLayoutInfo.bindingCount = static_cast<uint32_t>(globalBindings.size());
+        globalLayoutInfo.pBindings = globalBindings.data();
+        vkCreateDescriptorSetLayout(device, &globalLayoutInfo, nullptr, &globalDescriptorSetLayout);
+
+
+
+
+
+
+        /*
         VkDescriptorSetLayoutBinding colorImageLayoutBinding{};
         colorImageLayoutBinding.binding = bindingCounter++;
         colorImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -28,6 +57,7 @@ namespace VkApplication {
         colorImageLayoutBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
         colorImageLayoutBinding.pImmutableSamplers = nullptr; // Not needed for image
         bindings.push_back(colorImageLayoutBinding);
+        */
 
         VkDescriptorSetLayoutBinding depthImageLayoutBinding{};
         depthImageLayoutBinding.binding = bindingCounter++;
@@ -72,11 +102,12 @@ namespace VkApplication {
     void MainVulkApplication::createDescriptorSets() {
 
         std::vector<VkDescriptorPoolSize> poolSizes = {
-            { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 10 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 10 },
-            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10 },
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,10},
+            { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, swapChainImages.size() },
+            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, swapChainImages.size() },
+            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, objectCount },
+            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, materialCount },
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,textureCount },
         };
 
         VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{};
