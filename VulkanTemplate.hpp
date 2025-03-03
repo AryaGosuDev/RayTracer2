@@ -209,6 +209,7 @@ struct ScratchBuffer {
 };
 
 // mostly extends buffer class
+// used mostly for addressable gpu memory bit
 struct ExtendedvKBuffer {
 	VkStridedDeviceAddressRegionKHR stridedDeviceAddressRegion{};
 	VkDevice* device;
@@ -403,6 +404,11 @@ private:
 	VkRenderPass renderPass;
 
 	VkDescriptorSetLayout globalDescriptorSetLayout;
+	VkDescriptorSetLayout materialDescriptorSetLayout;
+	VkDescriptorSetLayout frameDescriptorSetLayout;
+	std::vector< VkDescriptorSet> globalDescriptorSet;
+	std::vector< VkDescriptorSet> materialDescriptorSet;
+	std::vector< VkDescriptorSet> frameDescriptorSet;
 	VkPipelineLayout pipelineLayout;
 	VkPipeline graphicsPipeline;
 
@@ -445,7 +451,6 @@ private:
 	*/
 	VkPhysicalDeviceRayTracingPipelinePropertiesKHR  rayTracingPipelineProperties{};
 	/*This struct enables support for acceleration structures(BVH trees) used in Vulkan Ray Tracing.
-
 	accelerationStructure: Indicates whether acceleration structures(AS) are supported.
 	accelerationStructureCaptureReplay : Enables AS capture& replay(e.g., for debugging).
 	accelerationStructureIndirectBuild : Supports indirect AS builds.
@@ -501,6 +506,7 @@ private:
 	void pickPhysicalDevice();
 	bool isDeviceSuitable(VkPhysicalDevice device);
 	void createLogicalDevice();
+	void getEnabledFeatures();
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice );
 	bool checkDeviceExtensionSupport(VkPhysicalDevice );
 
@@ -522,8 +528,6 @@ private:
 	void createGraphicsPipeline();
 	VkShaderModule createShaderModule(const std::vector<char>&);
 	void createCommandPool();
-	void createDepthResources();
-	void createFramebuffers();
 
 	void createVertexBuffer();
 	void createBuffer(VkDeviceSize, VkBufferUsageFlags,
@@ -554,10 +558,11 @@ private:
 	void transitionImageLayout(VkImage, VkFormat, VkImageLayout, VkImageLayout);
 	void createTextureImageView();
 	void createTextureSampler();
-	void setupRT();
 	void setupAS();
 	void createBLAS();
 	void createTLAS();
+	void createSBT();
+	void createShaderBindingTable(ExtendedvKBuffer&, uint32_t);
 
 	void initVulkan(std::string appName ) {
 
@@ -567,6 +572,7 @@ private:
 
 		createSurface();
 		pickPhysicalDevice();
+		getEnabledFeatures();
 		
 		createLogicalDevice();
 		createSwapChain();
@@ -574,11 +580,9 @@ private:
 		createDescriptorSetLayout();
 		createGraphicsPipeline();
 		createCommandPool();
-		createDepthResources();
-		createFramebuffers();
-		createTextureImage();
-		createTextureImageView();
-		createTextureSampler();
+		//createTextureImage();
+		//createTextureImageView();
+		//createTextureSampler();
 
 		loadModel();
 		createVertexBuffer();
@@ -681,5 +685,6 @@ namespace std {
 #include "VulkanRTDraw.hpp"
 #include "VulkanImgui.hpp"
 #include "VulkanAS.hpp"
+#include "VulkanSBT.hpp"
 
 #endif

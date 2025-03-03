@@ -42,100 +42,103 @@ namespace VkApplication {
         globalLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
         globalLayoutInfo.bindingCount = static_cast<uint32_t>(globalBindings.size());
         globalLayoutInfo.pBindings = globalBindings.data();
-        vkCreateDescriptorSetLayout(device, &globalLayoutInfo, nullptr, &globalDescriptorSetLayout);
+        check_vk_result ( vkCreateDescriptorSetLayout(device, &globalLayoutInfo, nullptr, &globalDescriptorSetLayout));
+        SetObjectName(device, reinterpret_cast<uint64_t> (globalDescriptorSetLayout), VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, "globalDescriptorSetLayout");
 
+        /* material set 1 */
+        std::vector<VkDescriptorSetLayoutBinding> materialBindings;
+        bindingCounter = 0;
 
-
-
-
-
-        /*
-        VkDescriptorSetLayoutBinding colorImageLayoutBinding{};
-        colorImageLayoutBinding.binding = bindingCounter++;
-        colorImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        colorImageLayoutBinding.descriptorCount = 1;
-        colorImageLayoutBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-        colorImageLayoutBinding.pImmutableSamplers = nullptr; // Not needed for image
-        bindings.push_back(colorImageLayoutBinding);
-        */
-
-        VkDescriptorSetLayoutBinding depthImageLayoutBinding{};
-        depthImageLayoutBinding.binding = bindingCounter++;
-        depthImageLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        depthImageLayoutBinding.descriptorCount = 1;
-        depthImageLayoutBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-        depthImageLayoutBinding.pImmutableSamplers = nullptr; // Not needed for image
-        bindings.push_back(depthImageLayoutBinding);
-
-        VkDescriptorSetLayoutBinding lightBinding{};
-        lightBinding.binding = bindingCounter++;
-        lightBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        lightBinding.descriptorCount = 1;
-        lightBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-        bindings.push_back(lightBinding);
-
+        // Material Storage Buffer
         VkDescriptorSetLayoutBinding materialBinding{};
         materialBinding.binding = bindingCounter++;
         materialBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         materialBinding.descriptorCount = 1;
-        materialBinding.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-        bindings.push_back(materialBinding);
+        materialBinding.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+        materialBindings.push_back(materialBinding);
 
-        // array of textures
+        // Texture Array (Bindless)
         VkDescriptorSetLayoutBinding textureBinding{};
         textureBinding.binding = bindingCounter++;
-        textureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        textureBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         textureBinding.descriptorCount = 1;
-        textureBinding.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-        bindings.push_back(textureBinding);
- 
-        VkDescriptorSetLayoutCreateInfo layoutInfo{};
-        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-        layoutInfo.pBindings = bindings.data();
+        textureBinding.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+        materialBindings.push_back(textureBinding);
 
-        if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create descriptor set layout!");
-        }
+        VkDescriptorSetLayoutCreateInfo materialLayoutInfo{};
+        materialLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        materialLayoutInfo.bindingCount = static_cast<uint32_t>(materialBindings.size());
+        materialLayoutInfo.pBindings = materialBindings.data();
+        check_vk_result(vkCreateDescriptorSetLayout(device, &materialLayoutInfo, nullptr, &materialDescriptorSetLayout));
+        SetObjectName(device, reinterpret_cast<uint64_t> (materialDescriptorSetLayout), VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, "materialDescriptorSetLayout");
+
+        /* image set data set 2 */
+        std::vector<VkDescriptorSetLayoutBinding> frameBindings;
+        bindingCounter = 0;
+
+        // Color Storage Image
+        VkDescriptorSetLayoutBinding colorImageBinding{};
+        colorImageBinding.binding = bindingCounter++;
+        colorImageBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        colorImageBinding.descriptorCount = 1;
+        colorImageBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+        frameBindings.push_back(colorImageBinding);
+
+        // Depth Storage Image
+        VkDescriptorSetLayoutBinding depthImageBinding{};
+        depthImageBinding.binding = bindingCounter++;
+        depthImageBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        depthImageBinding.descriptorCount = 1;
+        depthImageBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+        frameBindings.push_back(depthImageBinding);
+
+        VkDescriptorSetLayoutCreateInfo frameLayoutInfo{};
+        frameLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        frameLayoutInfo.bindingCount = static_cast<uint32_t>(frameBindings.size());
+        frameLayoutInfo.pBindings = frameBindings.data();
+        check_vk_result(vkCreateDescriptorSetLayout(device, &frameLayoutInfo, nullptr, &frameDescriptorSetLayout));
+        SetObjectName(device, reinterpret_cast<uint64_t> (frameDescriptorSetLayout), VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, "frameDescriptorSetLayout");
     }
 
     void MainVulkApplication::createDescriptorSets() {
 
         std::vector<VkDescriptorPoolSize> poolSizes = {
             { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, swapChainImages.size() },
+            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, swapChainImages.size() * 2 },
             { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, swapChainImages.size() },
-            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, objectCount },
+            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, objectCount }, // transformations
             { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, materialCount },
-            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,textureCount },
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, textureCount },
         };
 
         VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{};
         descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         descriptorPoolCreateInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
         descriptorPoolCreateInfo.pPoolSizes = poolSizes.data();
-        descriptorPoolCreateInfo.maxSets = swapChainImages.size() ;
+        descriptorPoolCreateInfo.maxSets = swapChainImages.size() * 3 ; // 3 descriptor sets per frame
         check_vk_result(vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, nullptr, &descriptorPool));
+        SetObjectName(device, reinterpret_cast<uint64_t> (descriptorPool), VK_OBJECT_TYPE_DESCRIPTOR_POOL, "descriptorPool");
 
-        VkDescriptorSetAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = descriptorPool; // Assume you have created a descriptor pool
-        allocInfo.descriptorSetCount = 1;
-        allocInfo.pSetLayouts = &descriptorSetLayout;
+        std::vector<VkDescriptorSetLayout> layouts = { globalDescriptorSetLayout, materialDescriptorSetLayout, frameDescriptorSetLayout };
 
-        std::vector<VkDescriptorSetLayout> layouts(swapChainImages.size(), descriptorSetLayout);
-        VkDescriptorSetAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        allocInfo.descriptorPool = descriptorPool;
-        allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
-        allocInfo.pSetLayouts = layouts.data();
+        std::vector<VkDescriptorSetAllocateInfo> allocInfos(layouts.size());
+        for (int i = 0; i < layouts.size(); i++) {
+            allocInfos[i].sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+            allocInfos[i].descriptorPool = descriptorPool;
+            allocInfos[i].descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
+            allocInfos[i].pSetLayouts = &layouts[i];
+        }
+        globalDescriptorSet.resize(swapChainImages.size());
+        materialDescriptorSet.resize(swapChainImages.size());
+        frameDescriptorSet.resize(swapChainImages.size());
 
-        descriptorSets.resize(swapChainImages.size());
-        // Vulkan allocates descriptor sets (not memory for buffers or textures).
-        // The descriptor set is simply a handle that references existing GPU resources.
-        if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) 
-            throw std::runtime_error("failed to allocate descriptor sets!");
-        
+        check_vk_result(vkAllocateDescriptorSets(device, &allocInfos[0], globalDescriptorSet.data()));
+        check_vk_result(vkAllocateDescriptorSets(device, &allocInfos[1], materialDescriptorSet.data()));
+        check_vk_result(vkAllocateDescriptorSets(device, &allocInfos[2], frameDescriptorSet.data()));
+        SetObjectName(device, reinterpret_cast<uint64_t> (globalDescriptorSet[0]), VK_OBJECT_TYPE_DESCRIPTOR_SET, "globalDescriptorSet");
+        SetObjectName(device, reinterpret_cast<uint64_t> (materialDescriptorSet[0]), VK_OBJECT_TYPE_DESCRIPTOR_SET, "materialDescriptorSet");
+        SetObjectName(device, reinterpret_cast<uint64_t> (frameDescriptorSet[0]), VK_OBJECT_TYPE_DESCRIPTOR_SET, "frameDescriptorSet");
+
         // TODO : make buffers
         for (size_t i = 0; i < swapChainImages.size(); i++) {
             VkDescriptorBufferInfo bufferInfo{};

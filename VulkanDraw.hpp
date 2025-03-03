@@ -335,9 +335,9 @@ namespace VkApplication {
         poolInfo.flags =
             VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-        if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create graphics command pool!");
-        }
+        check_vk_result(vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool));
+
+        SetObjectName(device, reinterpret_cast<uint64_t> (commandPool), VK_OBJECT_TYPE_COMMAND_POOL, "commandPool");
     }
 
     VkCommandBuffer MainVulkApplication::beginSingleTimeCommands() {

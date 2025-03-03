@@ -14,7 +14,7 @@ namespace VkApplication {
         deviceProperties2.pNext = &rayTracingPipelineProperties;
         vkGetPhysicalDeviceProperties2(physicalDevice, &deviceProperties2);
 
-        // Get acceleration structure properties, which will be used later on in the sample
+        // Get acceleration structure properties
         accelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
         VkPhysicalDeviceFeatures2 deviceFeatures2{};
         deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -47,29 +47,16 @@ namespace VkApplication {
         vkGetRayTracingShaderGroupHandlesKHR = reinterpret_cast<PFN_vkGetRayTracingShaderGroupHandlesKHR>(vkGetDeviceProcAddr(device, "vkGetRayTracingShaderGroupHandlesKHR"));
         vkCreateRayTracingPipelinesKHR = reinterpret_cast<PFN_vkCreateRayTracingPipelinesKHR>(vkGetDeviceProcAddr(device, "vkCreateRayTracingPipelinesKHR"));
 
-        //create output buffer images
-        createImage(swapChainExtent.width, swapChainExtent.height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            rtImageViews.RTColorImage, rtImageViews.RTColorImageMemory);
-        transitionImageLayout(rtImageViews.RTColorImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-        rtImageViews.RTColorImageView = createImageView(rtImageViews.RTColorImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-
-        createImage(swapChainExtent.width, swapChainExtent.height, VK_FORMAT_R32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            rtImageViews.RTDepthImage, rtImageViews.RTDepthImageMemory);
-        transitionImageLayout(rtImageViews.RTDepthImage, VK_FORMAT_R32_SFLOAT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-        rtImageViews.RTDepthImageView = createImageView(rtImageViews.RTDepthImage, VK_FORMAT_R32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT);
-
         auto rayGShaderCode = readFile("shaders/RT_raygen.spv");
         auto missRTShaderCode = readFile("shaders/RT_miss.spv");
         auto closeHitRTShaderCode = readFile("shaders/RT_closesthit.spv");
+        auto anyHitRTShaderCode = readFile("shaders/RT_anyhit.spv");
         auto intersectRTShaderCode = readFile("shaders/RT_intersection.spv");
 
         VkShaderModule rayGShaderModule = createShaderModule(rayGShaderCode);
         VkShaderModule missRTShaderModule = createShaderModule(missRTShaderCode);
         VkShaderModule closeHitRTShaderModule = createShaderModule(closeHitRTShaderCode);
+        VkShaderModule anyHitRTShaderModule = createShaderModule(anyHitRTShaderCode);
         VkShaderModule intersectRTShaderModule = createShaderModule(intersectRTShaderCode);
 
         VkPipelineShaderStageCreateInfo raygenShaderStageInfo{};
@@ -90,13 +77,19 @@ namespace VkApplication {
         closeHitRTShaderStageInfo.module = closeHitRTShaderModule;
         closeHitRTShaderStageInfo.pName = "main";
 
+        VkPipelineShaderStageCreateInfo anyHitRTShaderStageInfo{};
+        anyHitRTShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        anyHitRTShaderStageInfo.stage = VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+        anyHitRTShaderStageInfo.module = anyHitRTShaderModule;
+        anyHitRTShaderStageInfo.pName = "main";
+
         VkPipelineShaderStageCreateInfo intersectRTShaderStageInfo{};
         intersectRTShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         intersectRTShaderStageInfo.stage = VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
         intersectRTShaderStageInfo.module = intersectRTShaderModule;
         intersectRTShaderStageInfo.pName = "main";
 
-        VkPipelineShaderStageCreateInfo shaderStages[] = { raygenShaderStageInfo, missRTShaderStageInfo, closeHitRTShaderStageInfo,intersectRTShaderStageInfo };
+        VkPipelineShaderStageCreateInfo shaderStages[] = { raygenShaderStageInfo, missRTShaderStageInfo, closeHitRTShaderStageInfo,anyHitRTShaderStageInfo,intersectRTShaderStageInfo };
 
         VkRayTracingShaderGroupCreateInfoKHR raygenGroup{};
         raygenGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
@@ -121,8 +114,8 @@ namespace VkApplication {
         hitGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_KHR;  // For procedural
         hitGroup.generalShader = VK_SHADER_UNUSED_KHR;  // Not used in hit groups
         hitGroup.closestHitShader = 2;  // Index in pStages array
-        hitGroup.anyHitShader = VK_SHADER_UNUSED_KHR;  // Optional: VK_SHADER_UNUSED_KHR if not used
-        hitGroup.intersectionShader = 3;  // Not used for triangles
+        hitGroup.anyHitShader = 3;  // Optional: VK_SHADER_UNUSED_KHR if not used
+        hitGroup.intersectionShader = 4;  // Not used for triangles
         shaderGroups.push_back(hitGroup);
 
         VkRayTracingPipelineCreateInfoKHR rayTracingPipelineCI{};
@@ -136,6 +129,9 @@ namespace VkApplication {
         rayTracingPipelineCI.pGroups = shaderGroups;  // Pointer to shader groups array
         rayTracingPipelineCI.maxPipelineRayRecursionDepth = 1;  // Adjust based on your ray tracing depth requirements
         rayTracingPipelineCI.layout = pipelineLayout;  // The pipeline layout that matches the descriptors used by the shaders
+
+        check_vk_result(vkCreateRayTracingPipelinesKHR(device, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &rayTracingPipelineCI, nullptr, &graphicsPipeline));
+        SetObjectName(device, reinterpret_cast<uint64_t> (graphicsPipeline), VK_OBJECT_TYPE_PIPELINE, "graphicsPipeline");
     }
 
     VkShaderModule MainVulkApplication::createShaderModule(const std::vector<char>& code) {

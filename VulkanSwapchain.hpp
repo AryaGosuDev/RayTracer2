@@ -67,30 +67,6 @@ namespace VkApplication {
 		vkBindImageMemory(device, image, imageMemory, 0);
 	}
 
-	void MainVulkApplication::createFramebuffers() {
-		swapChainFramebuffers.resize(swapChainImageViews.size());
-
-		for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-			
-			std::array<VkImageView, 2> attachments = {
-				swapChainImageViews[i],
-				depthImageView
-			};
-			
-			VkFramebufferCreateInfo framebufferInfo{};
-			framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-			framebufferInfo.renderPass = renderPass;
-			framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-			framebufferInfo.pAttachments = attachments.data();
-			framebufferInfo.width = swapChainExtent.width;
-			framebufferInfo.height = swapChainExtent.height;
-			framebufferInfo.layers = 1;
-
-			if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
-				throw std::runtime_error("failed to create framebuffer!");
-			}
-		}
-	}
 
 	void MainVulkApplication::recreateSwapChain() {
 		int width = 0, height = 0;
@@ -106,10 +82,8 @@ namespace VkApplication {
 
 		createSwapChain();
 		createImageViews();
-		createRenderPass();
 		createGraphicsPipeline();
-		createDepthResources();
-		createFramebuffers();
+		
 		createUniformBuffers();
 		createDescriptorPool();
 		createDescriptorSets();
@@ -279,17 +253,6 @@ namespace VkApplication {
 
 	bool hasStencilComponent(VkFormat format) {
 		return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
-	}
-
-	void MainVulkApplication::createDepthResources() {
-		VkFormat depthFormat = findDepthFormat();
-
-		createImage(swapChainExtent.width, swapChainExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, 
-			VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
-			depthImage, depthImageMemory);
-		depthImageView = createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
-
-		transitionImageLayout(depthImage, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 	}
 
 	uint32_t MainVulkApplication::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
