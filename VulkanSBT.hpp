@@ -13,9 +13,9 @@ namespace VkApplication {
 			/-----------\
 			| raygen    |
 			|-----------|
-			| miss      |
+			| miss | shadow miss     
 			|-----------|
-			| hit + int |
+			| hit | shadow hit any hit 
 			\-----------/
 
 	*/
@@ -41,8 +41,8 @@ namespace VkApplication {
 		shaderBindingTables.callable.device = &device;
 
 		createShaderBindingTable(shaderBindingTables.raygen, 1);
-		createShaderBindingTable(shaderBindingTables.miss, 1);
-		createShaderBindingTable(shaderBindingTables.hit, 1);
+		createShaderBindingTable(shaderBindingTables.miss, 2);
+		createShaderBindingTable(shaderBindingTables.hit, 2);
 
 		// Copy handles
 		memcpy(shaderBindingTables.raygen.mapped, shaderHandleStorage.data(), handleSize);

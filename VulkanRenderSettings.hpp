@@ -4,6 +4,37 @@
 
 namespace VkApplication {
 
+    auto createShaderStage(VkShaderModule & module, VkShaderStageFlagBits stage) {
+        VkPipelineShaderStageCreateInfo stageInfo{};
+        stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stageInfo.stage = stage;
+        stageInfo.module = module;
+        stageInfo.pName = "main";
+        return stageInfo;
+    }
+
+    VkRayTracingShaderGroupCreateInfoKHR makeGeneralGroup(uint32_t shaderIndex) {
+        VkRayTracingShaderGroupCreateInfoKHR group{};
+        group.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+        group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+        group.generalShader = shaderIndex;
+        group.closestHitShader = VK_SHADER_UNUSED_KHR;
+        group.anyHitShader = VK_SHADER_UNUSED_KHR;
+        group.intersectionShader = VK_SHADER_UNUSED_KHR;
+        return group;
+    }
+
+    VkRayTracingShaderGroupCreateInfoKHR makeHitGroup(uint32_t closestHit, uint32_t anyHit, uint32_t intersection) {
+        VkRayTracingShaderGroupCreateInfoKHR group{};
+        group.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+        group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_KHR;
+        group.generalShader = VK_SHADER_UNUSED_KHR;
+        group.closestHitShader = closestHit;
+        group.anyHitShader = anyHit;
+        group.intersectionShader = intersection;
+        return group;
+    }
+
     void MainVulkApplication::createGraphicsPipeline() {
 
         // Get ray tracing pipeline properties
@@ -47,86 +78,88 @@ namespace VkApplication {
         vkGetRayTracingShaderGroupHandlesKHR = reinterpret_cast<PFN_vkGetRayTracingShaderGroupHandlesKHR>(vkGetDeviceProcAddr(device, "vkGetRayTracingShaderGroupHandlesKHR"));
         vkCreateRayTracingPipelinesKHR = reinterpret_cast<PFN_vkCreateRayTracingPipelinesKHR>(vkGetDeviceProcAddr(device, "vkCreateRayTracingPipelinesKHR"));
 
-        auto rayGShaderCode = readFile("shaders/RT_raygen.spv");
-        auto missRTShaderCode = readFile("shaders/RT_miss.spv");
-        auto closeHitRTShaderCode = readFile("shaders/RT_closesthit.spv");
-        auto anyHitRTShaderCode = readFile("shaders/RT_anyhit.spv");
-        auto intersectRTShaderCode = readFile("shaders/RT_intersection.spv");
+        std::vector<std::string> shaderPaths = {
+            "shaders/RT_raygen.spv",
+            "shaders/RT_miss.spv",
+            "shaders/RT_closesthit.spv",
+            "shaders/RT_anyhit.spv",
+            "shaders/RT_intersection.spv",
+            "shaders/RT_missShadow.spv",
+            "shaders/RT_anyhit_shadow.spv"
+        };
 
-        VkShaderModule rayGShaderModule = createShaderModule(rayGShaderCode);
-        VkShaderModule missRTShaderModule = createShaderModule(missRTShaderCode);
-        VkShaderModule closeHitRTShaderModule = createShaderModule(closeHitRTShaderCode);
-        VkShaderModule anyHitRTShaderModule = createShaderModule(anyHitRTShaderCode);
-        VkShaderModule intersectRTShaderModule = createShaderModule(intersectRTShaderCode);
+        std::vector<VkShaderModule> shaderModules;
+        std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
 
-        VkPipelineShaderStageCreateInfo raygenShaderStageInfo{};
-        raygenShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        raygenShaderStageInfo.stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-        raygenShaderStageInfo.module = rayGShaderModule;
-        raygenShaderStageInfo.pName = "main";
+        for (const auto& path : shaderPaths) {
+            auto shaderCode = readFile(path);
+            VkShaderModule module = createShaderModule(shaderCode);
+            shaderModules.push_back(module);
+        }
 
-        VkPipelineShaderStageCreateInfo missRTShaderStageInfo{};
-        missRTShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        missRTShaderStageInfo.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
-        missRTShaderStageInfo.module = missRTShaderModule;
-        missRTShaderStageInfo.pName = "main";
+        std::vector<VkRayTracingShaderGroupCreateInfoKHR> shaderGroups;
 
-        VkPipelineShaderStageCreateInfo closeHitRTShaderStageInfo{};
-        closeHitRTShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        closeHitRTShaderStageInfo.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-        closeHitRTShaderStageInfo.module = closeHitRTShaderModule;
-        closeHitRTShaderStageInfo.pName = "main";
+        shaderStages.push_back(createShaderStage(shaderModules[0], VK_SHADER_STAGE_RAYGEN_BIT_KHR));
+        shaderStages.push_back(createShaderStage(shaderModules[1], VK_SHADER_STAGE_MISS_BIT_KHR));
+        shaderStages.push_back(createShaderStage(shaderModules[2], VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR));
+        shaderStages.push_back(createShaderStage(shaderModules[3], VK_SHADER_STAGE_ANY_HIT_BIT_KHR));
+        shaderStages.push_back(createShaderStage(shaderModules[4], VK_SHADER_STAGE_INTERSECTION_BIT_KHR));
+        shaderStages.push_back(createShaderStage(shaderModules[5], VK_SHADER_STAGE_MISS_BIT_KHR));
+        shaderStages.push_back(createShaderStage(shaderModules[6], VK_SHADER_STAGE_ANY_HIT_BIT_KHR));
 
-        VkPipelineShaderStageCreateInfo anyHitRTShaderStageInfo{};
-        anyHitRTShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        anyHitRTShaderStageInfo.stage = VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
-        anyHitRTShaderStageInfo.module = anyHitRTShaderModule;
-        anyHitRTShaderStageInfo.pName = "main";
+        VkRayTracingShaderGroupCreateInfoKHR NormalRaygenGroup{};
+        NormalRaygenGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+        NormalRaygenGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+        NormalRaygenGroup.generalShader = 0;  // Index of raygen shader in pStages
+        NormalRaygenGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
+        NormalRaygenGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
+        NormalRaygenGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
+        shaderGroups.push_back(NormalRaygenGroup);
 
-        VkPipelineShaderStageCreateInfo intersectRTShaderStageInfo{};
-        intersectRTShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        intersectRTShaderStageInfo.stage = VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
-        intersectRTShaderStageInfo.module = intersectRTShaderModule;
-        intersectRTShaderStageInfo.pName = "main";
+        VkRayTracingShaderGroupCreateInfoKHR normalMissGroup{};
+        normalMissGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+        normalMissGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+        normalMissGroup.generalShader = 1;  // Index in pStages array
+        normalMissGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
+        normalMissGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
+        normalMissGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
+        shaderGroups.push_back(normalMissGroup);
 
-        VkPipelineShaderStageCreateInfo shaderStages[] = { raygenShaderStageInfo, missRTShaderStageInfo, closeHitRTShaderStageInfo,anyHitRTShaderStageInfo,intersectRTShaderStageInfo };
+        VkRayTracingShaderGroupCreateInfoKHR shadowMissGroup{};
+        shadowMissGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+        shadowMissGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+        shadowMissGroup.generalShader = 5;  // Index in pStages array
+        shadowMissGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
+        shadowMissGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
+        shadowMissGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
+        shaderGroups.push_back(shadowMissGroup);
 
-        VkRayTracingShaderGroupCreateInfoKHR raygenGroup{};
-        raygenGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-        raygenGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
-        raygenGroup.generalShader = 0;  // Index of raygen shader in pStages
-        raygenGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
-        raygenGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
-        raygenGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
-        shaderGroups.push_back(raygenGroup);
+        VkRayTracingShaderGroupCreateInfoKHR normalHitGroup{};
+        normalHitGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+        normalHitGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;  // For procedural
+        normalHitGroup.generalShader = VK_SHADER_UNUSED_KHR;  // Not used in hit groups
+        normalHitGroup.closestHitShader = 2;  // Index in pStages array
+        normalHitGroup.anyHitShader = VK_SHADER_UNUSED_KHR;  // Optional: VK_SHADER_UNUSED_KHR if not used
+        normalHitGroup.intersectionShader = VK_SHADER_UNUSED_KHR;  // Not used for triangles
+        shaderGroups.push_back(normalHitGroup);
 
-        VkRayTracingShaderGroupCreateInfoKHR missGroup{};
-        missGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-        missGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR; 
-        missGroup.generalShader = 1;  // Index in pStages array
-        missGroup.closestHitShader = VK_SHADER_UNUSED_KHR;
-        missGroup.anyHitShader = VK_SHADER_UNUSED_KHR;
-        missGroup.intersectionShader = VK_SHADER_UNUSED_KHR;
-        shaderGroups.push_back(missGroup);
-
-        VkRayTracingShaderGroupCreateInfoKHR hitGroup{};
-        hitGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-        hitGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_KHR;  // For procedural
-        hitGroup.generalShader = VK_SHADER_UNUSED_KHR;  // Not used in hit groups
-        hitGroup.closestHitShader = 2;  // Index in pStages array
-        hitGroup.anyHitShader = 3;  // Optional: VK_SHADER_UNUSED_KHR if not used
-        hitGroup.intersectionShader = 4;  // Not used for triangles
-        shaderGroups.push_back(hitGroup);
+        VkRayTracingShaderGroupCreateInfoKHR shadowHitGroup{};
+        shadowHitGroup.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+        shadowHitGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;  // For procedural
+        shadowHitGroup.generalShader = VK_SHADER_UNUSED_KHR;  // Not used in hit groups
+        shadowHitGroup.closestHitShader = VK_SHADER_UNUSED_KHR;  // Index in pStages array
+        shadowHitGroup.anyHitShader = 6;  // Optional: VK_SHADER_UNUSED_KHR if not used
+        shadowHitGroup.intersectionShader = VK_SHADER_UNUSED_KHR;  // Not used for triangles
+        shaderGroups.push_back(shadowHitGroup);
 
         VkRayTracingPipelineCreateInfoKHR rayTracingPipelineCI{};
         rayTracingPipelineCI.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
         rayTracingPipelineCI.pNext = nullptr;
         rayTracingPipelineCI.flags = 0;
         rayTracingPipelineCI.stageCount = sizeof(shaderStages) / sizeof(shaderStages[0]); // Number of shader stages
-        rayTracingPipelineCI.pStages = shaderStages;  // Pointer to shader stages array
+        rayTracingPipelineCI.pStages = shaderStages.data();  // Pointer to shader stages array
         rayTracingPipelineCI.groupCount = shaderGroups.size();  // Number of shader groups
-        VkRayTracingShaderGroupCreateInfoKHR shaderGroups[] = { raygenGroup, missGroup, hitGroup };
-        rayTracingPipelineCI.pGroups = shaderGroups;  // Pointer to shader groups array
+        rayTracingPipelineCI.pGroups = shaderGroups.data();  // Pointer to shader groups array
         rayTracingPipelineCI.maxPipelineRayRecursionDepth = 1;  // Adjust based on your ray tracing depth requirements
         rayTracingPipelineCI.layout = pipelineLayout;  // The pipeline layout that matches the descriptors used by the shaders
 

@@ -43,7 +43,6 @@ namespace VkApplication {
 		SetObjectName(device, reinterpret_cast<uint64_t>(instance), VK_OBJECT_TYPE_INSTANCE, "Main Instance");
 	}
 
-
 	bool checkExtensions() {
 		uint32_t extensions_count = 0;
 		VkResult result = VK_SUCCESS;

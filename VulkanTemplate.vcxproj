@@ -178,6 +178,7 @@
     <ClInclude Include="VulkanImgui.hpp" />
     <ClInclude Include="VulkanInstance.hpp" />
     <ClInclude Include="VulkanRenderSettings.hpp" />
+    <ClInclude Include="VulkanSBT.hpp" />
     <ClInclude Include="VulkanSwapchain.hpp" />
     <ClInclude Include="VulkanSync.hpp" />
     <ClInclude Include="VulkanTemplate.hpp" />
