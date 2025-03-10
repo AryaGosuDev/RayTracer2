@@ -33,6 +33,8 @@
 #include <glm/gtx/hash.hpp>
 #include <glm/ext/scalar_constants.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
+#include <glm/gtc/packing.hpp>
+#include <glm/gtx/type_aligned.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/ext.hpp>
 
@@ -50,6 +52,9 @@
 #include <assimp/Importer.hpp>      // C++ importer interface
 #include <assimp/scene.h>           // Output data structure
 #include <assimp/postprocess.h>     // Post processing flags
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 #ifdef _DEBUG
 constexpr bool enableValidationLayers = true;
@@ -108,6 +113,9 @@ struct Vertex {
 	glm::vec3 normal;
 	glm::vec3 pos;
 	glm::vec2 texCoord;
+	glm::vec2 texCoord1;
+	glm::vec4 tangent;
+	uint32_t materialIndx;
 
 	static VkVertexInputBindingDescription getBindingDescription() {
 		VkVertexInputBindingDescription bindingDescription = {};
@@ -116,9 +124,8 @@ struct Vertex {
 		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 		return bindingDescription;
 	}
-
 	static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
-		std::vector<VkVertexInputAttributeDescription> attributeDescriptions(4);
+		std::vector<VkVertexInputAttributeDescription> attributeDescriptions(7);
 
 		attributeDescriptions[0].binding = 0;
 		attributeDescriptions[0].location = 0;
@@ -140,7 +147,30 @@ struct Vertex {
 		attributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
 		attributeDescriptions[3].offset = offsetof(Vertex, texCoord);
 
+		attributeDescriptions[4].binding = 0;
+		attributeDescriptions[4].location = 4;
+		attributeDescriptions[4].format = VK_FORMAT_R32G32_SFLOAT;
+		attributeDescriptions[4].offset = offsetof(Vertex, texCoord1);
+
+		attributeDescriptions[5].binding = 0;
+		attributeDescriptions[5].location = 5;
+		attributeDescriptions[5].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[5].offset = offsetof(Vertex, tangent);
+
+		attributeDescriptions[6].binding = 0;
+		attributeDescriptions[6].location = 6;
+		attributeDescriptions[6].format = VK_FORMAT_R32_UINT;
+		attributeDescriptions[6].offset = offsetof(Vertex, materialIndx);
+
 		return attributeDescriptions;
+	}
+
+	void applyTransform(const glm::mat4& m) {
+		auto newp = m * glm::vec4(pos, 1.0);
+		pos = glm::vec3(newp.x, newp.y, newp.z);
+		glm::mat3 normalMatrix = glm::inverseTranspose(glm::mat3(m));
+		normal = normalMatrix * normal;
+		tangent = glm::inverseTranspose(m) * tangent;
 	}
 
 	bool operator==(const Vertex& other) const {
@@ -148,51 +178,14 @@ struct Vertex {
 	}
 };
 
-// Per-instance data block
-struct InstanceData {
-	glm::vec3 pos;
-	glm::vec3 rot;
-	uint32_t texIndex;
-	glm::vec3 instanceColor;
-
-	static VkVertexInputBindingDescription getBindingDescription() {
-		VkVertexInputBindingDescription bindingDescription = {};
-		bindingDescription.binding = 1;
-		bindingDescription.stride = sizeof(InstanceData);
-		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
-
-		return bindingDescription;
-	}
-
-	static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
-		std::vector<VkVertexInputAttributeDescription> attributeDescriptions(4);
-
-		attributeDescriptions[0].binding = 1;
-		attributeDescriptions[0].location = 4;
-		attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attributeDescriptions[0].offset = offsetof(InstanceData, pos);
-
-		attributeDescriptions[1].binding = 1;
-		attributeDescriptions[1].location = 5;
-		attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attributeDescriptions[1].offset = offsetof(InstanceData, rot);
-
-		attributeDescriptions[2].binding = 1;
-		attributeDescriptions[2].location = 6;
-		attributeDescriptions[2].format = VK_FORMAT_R32_SINT;
-		attributeDescriptions[2].offset = offsetof(InstanceData, texIndex);
-
-		attributeDescriptions[3].binding = 1;
-		attributeDescriptions[3].location = 7;
-		attributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attributeDescriptions[3].offset = offsetof(InstanceData, instanceColor);
-
-		return attributeDescriptions;
-	}
-
-	bool operator==(const InstanceData& other) const {
-		return pos == other.pos && rot == other.rot && texIndex == other.texIndex && instanceColor == other.instanceColor;
-	}
+struct stbImageData {
+	stbImageData(const std::vector<uint8_t>& imageData, bool useFloat = false);
+	stbImageData(const std::vector<char>& imageData, bool useFloat = false);
+	~stbImageData();
+	void* data = nullptr;
+	int width = 0;
+	int height = 0;
+	int channels = 0;
 };
 
 struct AccelerationStructure {
@@ -294,13 +287,20 @@ struct RTImageViews {
 };
 
 struct Material {
-	glm::vec3 diffuseColor;
-	glm::vec3 ambientColor;
-	glm::vec3 specularColor;
-	float roughness;
-	float metallic;
-	int textureIndex;  // Index into the texture array
-	
+	int basecolorTextureId = -1;
+	int basecolorSamplerId = -1;
+	int metallicRoughnessTextureId = -1;
+	int metallicRoughnessSamplerId = -1;
+	int normalTextureTextureId = -1;
+	int normalTextureSamplerId = -1;
+	int emissiveTextureId = -1;
+	int emissiveSamplerId = -1;
+	float metallicFactor = 1.0;
+	float roughnessFactor = 1.0;
+	glm::vec4 basecolor;
+	// maybe more properties to add like occlusion etc....
+	glm::vec2 padding;  // needed to make sure its aligned since materials will be passed as
+	// this makes it 64 bytes
 };
 
 struct SceneObject {
